@@ -39,6 +39,7 @@ The app will be available at:
 
 http://localhost:3000
 
+<img width="1908" height="884" alt="image" src="https://github.com/user-attachments/assets/ecf83d15-f790-412f-abf8-9d531c9fac5b" />
 
 ---
 ---
