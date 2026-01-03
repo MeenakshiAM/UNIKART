@@ -6,10 +6,12 @@ async function runModeration({ targetType, text, imageUrls }) {
   let textResult = { violation: "SAFE", score: 0 };
   let imageResult = { violation: "SAFE", score: 0 };
 
-  if (text) {
-    textResult = analyzeText(text);
+  // TEXT ANALYSIS (Perspective API)
+  if (text && text.trim().length > 0) {
+    textResult = await analyzeText(text);
   }
 
+  // IMAGE ANALYSIS (simulated / future vision API)
   if (imageUrls && imageUrls.length > 0) {
     imageResult = analyzeImage(imageUrls);
   }
@@ -17,11 +19,16 @@ async function runModeration({ targetType, text, imageUrls }) {
   let violation = "SAFE";
   let action = "NONE";
 
+  // TEXT-BASED DECISION
   if (textResult.violation !== "SAFE") {
     violation = textResult.violation;
-    action = "HIDE_CONTENT";
+    action =
+      targetType === "REVIEW"
+        ? "HIDE_REVIEW"
+        : "BLOCK_PRODUCT";
   }
 
+  // IMAGE-BASED DECISION (higher priority)
   if (imageResult.violation !== "SAFE") {
     violation = imageResult.violation;
     action = "BLOCK_PRODUCT";
@@ -32,7 +39,8 @@ async function runModeration({ targetType, text, imageUrls }) {
     textScore: textResult.score,
     imageScore: imageResult.score,
     violation,
-    action
+    action,
+    automated: true
   };
 }
 

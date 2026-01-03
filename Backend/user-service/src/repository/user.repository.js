@@ -1,0 +1,17 @@
+const User = require("../models/user.model");
+
+exports.createUser = async (userData) => {
+  const user = new User(userData);
+  return await user.save();
+};
+
+exports.findUserByEmail = async (email) => {
+  return await User.findOne({ email });
+};
+
+exports.getAllUsers = async () => {
+  return await User.find();
+};
+exports.getUserById = async (userId) => {
+    return await User.findById(userId);
+};

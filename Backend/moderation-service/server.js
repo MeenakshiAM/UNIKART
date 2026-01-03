@@ -8,7 +8,7 @@ app.get("/health", (req, res) => {
   res.json({ status: "Moderation service running" });
 });
 
-const PORT = process.env.PORT || 4003;
+const PORT = process.env.PORT;
 
 app.listen(PORT, () => {
   console.log(`Moderation Service running on port ${PORT}`);

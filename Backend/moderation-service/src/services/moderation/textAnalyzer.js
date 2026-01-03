@@ -1,32 +1,38 @@
-// Very basic text moderation (NO AI yet)
+const axios = require("axios");
 
-const bannedWords = ["scam", "fraud", "sex", "fake","porn","pornography","cocaneine","drug","MDMA","heroin","marijuana"];
+const PERSPECTIVE_URL =
+  "https://commentanalyzer.googleapis.com/v1alpha1/comments:analyze";
 
-function analyzeText(text) {
-  let score = 0;
-
-  if (!text) {
-    return { violation: "SAFE", score: 0 };
+async function analyzeText(text) {
+  if (!text || text.trim().length === 0) {
+    return { score: 0, violation: "SAFE" };
   }
 
-  const lowerText = text.toLowerCase();
-
-  for (let word of bannedWords) {
-    if (lowerText.includes(word)) {
-      score += 1;
+  const response = await axios.post(
+    `${PERSPECTIVE_URL}?key=${process.env.PERSPECTIVE_API_KEY}`,
+    {
+      comment: { text },
+      languages: ["en"],
+      requestedAttributes: {
+        TOXICITY: {},
+        INSULT: {},
+        THREAT: {}
+      }
     }
-  }
+  );
 
-  if (score > 0) {
-    return {
-      violation: "TEXT_VIOLATION",
-      score
-    };
-  }
+  const scores = response.data.attributeScores;
+
+  const toxicity = scores.TOXICITY.summaryScore.value;
+
+  let violation = "SAFE";
+  if (toxicity > 0.85) violation = "ILLEGAL";
+  else if (toxicity > 0.65) violation = "ADULT";
+  else if (toxicity > 0.4) violation = "SPAM";
 
   return {
-    violation: "SAFE",
-    score: 0
+    score: toxicity,
+    violation
   };
 }
 
