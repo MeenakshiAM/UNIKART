@@ -11,6 +11,7 @@ function isValidAge(dob) {
   if (!dob) return false;
   const birthDate = new Date(dob);
   const today = new Date();
+
   let age = today.getFullYear() - birthDate.getFullYear();
   const m = today.getMonth() - birthDate.getMonth();
   if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
@@ -21,23 +22,28 @@ function isValidAge(dob) {
 
 const allowedDepartments = ["IT", "CS", "EC", "ER", "CV"];
 
-// -------- Services --------
-exports.registerUser = async ({ name, email, password, registerNumber, dateOfBirth, department }) => {
-  // Check if user exists
+// ------------------ USER REGISTRATION ------------------
+exports.registerUser = async ({
+  name,
+  email,
+  password,
+  registerNumber,
+  dateOfBirth,
+  department
+}) => {
   const existingUser = await userRepo.findUserByEmail(email);
   if (existingUser) throw new Error("Email already exists");
 
-  // Registration number validation
-  if (!isValidRegisterNumber(registerNumber)) throw new Error("Invalid registration number");
+  if (!isValidRegisterNumber(registerNumber))
+    throw new Error("Invalid registration number");
 
-  // Age validation
-  if (!isValidAge(dateOfBirth)) throw new Error("Age must be between 18 and 25");
+  if (!isValidAge(dateOfBirth))
+    throw new Error("Age must be between 18 and 25");
 
-  // Department validation
-  if (!allowedDepartments.includes(department)) throw new Error("Invalid department");
+  if (!allowedDepartments.includes(department))
+    throw new Error("Invalid department");
 
-  // Create user
-  const newUser = await userRepo.createUser({
+  return await userRepo.createUser({
     name,
     email,
     password,
@@ -46,38 +52,53 @@ exports.registerUser = async ({ name, email, password, registerNumber, dateOfBir
     department,
     isSeller: false
   });
-
-  return newUser;
 };
 
-exports.registerSeller = async ({ userId, shopName, shopDescription, agreedToCommission }) => {
-  // Check if user exists
+// ------------------ SELLER REGISTRATION ------------------
+exports.registerSeller = async ({
+  userId,
+  shopName,
+  shopDescription,
+  agreedToCommission
+}) => {
   const user = await userRepo.getUserById(userId);
   if (!user) throw new Error("User not found");
 
-  // Already a seller?
-  if (user.isSeller) throw new Error("User is already a seller");
+  if (user.isSeller)
+    throw new Error("User already registered as seller");
 
-  // Create seller profile with pending status
+  // 🔥 Automated verification
+  const isVerified =
+    isValidRegisterNumber(user.registerNumber) &&
+    isValidAge(user.dateOfBirth) &&
+    allowedDepartments.includes(user.department) &&
+    agreedToCommission === true;
+
+  const status = isVerified ? "ACTIVE" : "PENDING";
+
   const profile = await sellerRepo.createSellerProfile({
     userId,
     shopName,
     shopDescription,
     agreedToCommission,
-    status: "PENDING"
+    status
   });
 
-  // Automatically approve if validations passed (example)
-  // Here you can add extra checks later
-  profile.status = "ACTIVE";
-  await profile.save();
+  // mark seller intent
+  await userRepo.updateUserById(userId, { isSeller: true });
 
-  // Update user to mark as seller
-  user.isSeller = true;
-  await user.save();
+  return {
+    message: isVerified
+      ? "Seller activated successfully"
+      : "Seller registered, pending verification",
+    profile
+  };
+  
 
-  return { user, profile };
 };
- 
 
 
+
+exports.getAllUsers = async () => {
+  return await userRepo.getAllUsers();
+};

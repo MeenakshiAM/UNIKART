@@ -15,3 +15,11 @@ exports.getAllUsers = async () => {
 exports.getUserById = async (userId) => {
     return await User.findById(userId);
 };
+
+exports.updateUserById = async (userId, updateData) => {
+  return await User.findByIdAndUpdate(
+    userId,
+    updateData,
+    { new: true } // return updated document
+  );
+};
