@@ -1,5 +1,7 @@
 const userRepo = require("../repository/user.repository");
 const sellerRepo = require("../repository/sellerProfile.repository");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 
 // -------- Validation Functions --------
 function isValidRegisterNumber(registerNumber) {
@@ -56,19 +58,12 @@ exports.registerUser = async ({
 };
 
 // ------------------ SELLER REGISTRATION ------------------
-exports.registerSeller = async ({
-  userId,
-  shopName,
-  shopDescription,
-  agreedToCommission
-}) => {
+exports.registerSeller = async ({ userId, shopName, shopDescription, agreedToCommission }) => {
   const user = await userRepo.getUserById(userId);
   if (!user) throw new Error("User not found");
 
-  if (user.isSeller)
-    throw new Error("User already registered as seller");
+  const existingProfile = await sellerRepo.getSellerByUserId(userId);
 
-  // 🔥 Automated verification
   const isVerified =
     isValidRegisterNumber(user.registerNumber) &&
     isValidAge(user.dateOfBirth) &&
@@ -77,29 +72,87 @@ exports.registerSeller = async ({
 
   const status = isVerified ? "ACTIVE" : "PENDING";
 
-  const profile = await sellerRepo.createSellerProfile({
-    userId,
-    shopName,
-    shopDescription,
-    agreedToCommission,
-    status
-  });
+  // 🟢 CASE 1: No profile → CREATE
+  if (!existingProfile) {
+    const profile = await sellerRepo.createSellerProfile({
+      userId,
+      shopName,
+      shopDescription,
+      agreedToCommission,
+      status
+    });
 
-  // mark seller intent
-  await userRepo.updateUserById(userId, { isSeller: true });
+    if (status === "ACTIVE") {
+      await userRepo.updateUserById(userId, { isSeller: true });
+    }
 
-  return {
-    message: isVerified
-      ? "Seller activated successfully"
-      : "Seller registered, pending verification",
-    profile
-  };
-  
+    return {
+      message: status === "ACTIVE"
+        ? "Seller activated successfully"
+        : "Seller registered, pending verification",
+      profile
+    };
+  }
 
+  // 🟡 CASE 2: Exists but PENDING → UPDATE
+  if (existingProfile.status === "PENDING") {
+    const updatedProfile = await sellerRepo.updateSellerByUserId(userId, {
+      shopName,
+      shopDescription,
+      agreedToCommission,
+      status
+    });
+
+    if (status === "ACTIVE") {
+      await userRepo.updateUserById(userId, { isSeller: true });
+    }
+
+    return {
+      message: status === "ACTIVE"
+        ? "Seller activated successfully"
+        : "Seller details updated, still pending",
+      profile: updatedProfile
+    };
+  }
+
+  // 🔴 CASE 3: Already ACTIVE
+  throw new Error("User already an active seller");
 };
+
 
 
 
 exports.getAllUsers = async () => {
   return await userRepo.getAllUsers();
+};
+
+//-------------------------------LOGIN FUNCTIONALITY-------------------------------
+
+exports.loginUser = async ({ email, password }) => {
+  const user = await userRepo.findUserByEmail(email);
+  if (!user) {
+    throw new Error("Invalid email or password");
+  }
+
+  const isMatch = await bcrypt.compare(password, user.password);
+  if (!isMatch) {
+    throw new Error("Invalid email or password");
+  }
+
+  const token = jwt.sign(
+    { userId: user._id },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN }
+  );
+
+  return {
+    message: "Login successful",
+    token,
+    user: {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      isSeller: user.isSeller
+    }
+  };
 };
